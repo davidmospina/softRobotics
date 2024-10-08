@@ -45,6 +45,7 @@ class Motor {
       analogWrite(speedPin, 0);   // Stop the motor by setting speed to 0
       digitalWrite(directionPin, HIGH);    // Keep direction set (optional)
     }
+    // comment Pauline
 };
 
 // Valve class definition
