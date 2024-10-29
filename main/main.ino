@@ -1,32 +1,45 @@
-#include "Arduino.h"
+#define PRESSURE_SENSOR_1 (A1) //  MPX5100 Series Integrated Silicon Pressure Sensor analog input (0 to 100 kPa)
+#define PRESSURE_SENSOR_2 (A2)
 
-#define PRESSURE_SENSOR (A1)             //  MPX5100 Series Integrated Silicon Pressure Sensor analog input (0 to 100 kPa)
+// ________________________________________________Arduino PWM Speed Control_______________________________________________________________________//
 
-//Arduino PWM Speed Control：
-int E1 = 3;    ///<Pump 1 Speed
-int M1 = 4;    ///<Pump 1 Direction
+// M1 = Pump1
+int E1 = 3; //Speed
+int M1 = 4; //Direction
 
-int E2 = 11;   ///<Valve 1 Enable
-int M2 = 12;  ///<Valve  1 State
+// M2 = Valv1
+int E2 = 11;   //Enable
+int M2 = 12;  //State
 
-const int E3 = 5; ///<Pump 2 Speed
-const int M3 = 8; ///<Pump 2 Direction
+// M3 = Pump2
+const int E3 = 5;
+const int M3 = 8;
 
-const int E4 = 6; ///<Valve 2 Enable
-const int M4 = 7; ///<Valve 1 Direction
+// M4 = Valv2
+const int E4 = 6;
+const int M4 = 7;
 
-int timecounter = 1;  // Auxiliary variable for controlling the time of the process
-bool lock = false;
-int stateprocess = 0;
+//___________________________________________________________States________________________________________________________________________________//
+enum State {
+  INFLATE_1,
+  INFLATE_1_2,
+  INFLATE_2,
+  DEFLATE_1_2,
+};
 
-// Motor class definition
+State state = INFLATE_1;
+State previousState;
+
+//___________________________________________________________Class________________________________________________________________________________//
+
 class Motor {
   private:
-    int speedPin;     // Pin for PWM speed control
-    int directionPin; // Pin for motor direction control
+    int speedPin;
+    int directionPin;
 
   public:
-    // Constructor: takes speed pin and direction pin as arguments
+    bool state;
+
     Motor(int spdPin, int dirPin) {
       speedPin = spdPin;
       directionPin = dirPin;
@@ -34,28 +47,27 @@ class Motor {
       pinMode(directionPin, OUTPUT);
     }
 
-    // Turn the motor on at a given speed
     void on(int motorspeed) {
-      analogWrite(speedPin, motorspeed);   // PWM Speed Control value
-      digitalWrite(directionPin, HIGH);    // Set direction (HIGH or LOW can represent forward/reverse)
+      analogWrite(speedPin, motorspeed);
+      digitalWrite(directionPin, HIGH);
+      state = true;
     }
-
-    // Turn the motor off
-    void off() {
-      analogWrite(speedPin, 0);   // Stop the motor by setting speed to 0
-      digitalWrite(directionPin, HIGH);    // Keep direction set (optional)
+      
+    void off()
+    {
+      analogWrite(speedPin, 0);
+      digitalWrite(directionPin, HIGH);
+      state = false;
     }
-    // comment Pauline
 };
 
-// Valve class definition
 class Valve {
   private:
-    int enablePin;  // Pin for enabling the valve
-    int statePin;   // Pin for controlling the valve state (on/off)
+    int enablePin;
+    int statePin;
 
   public:
-    // Constructor: takes enable pin and state pin as arguments
+    bool state;
     Valve(int enPin, int stPin) {
       enablePin = enPin;
       statePin = stPin;
@@ -63,116 +75,184 @@ class Valve {
       pinMode(statePin, OUTPUT);
     }
 
-    // Open the valve
-    void on() {
-      analogWrite(enablePin, 255);   // Fully open the valve (PWM at max)
-      digitalWrite(statePin, HIGH);  // Set state to open
-    }
-
-    // Close the valve
     void off() {
-      analogWrite(enablePin, 0);     // Close the valve (PWM at 0)
-      digitalWrite(statePin, HIGH);  // Keep state set (optional)
+      analogWrite(enablePin, 255);
+      digitalWrite(statePin, HIGH);
+      state = false;
+      //Serial.println("try to on valve");
+    }
+      
+    void on() {
+      analogWrite(enablePin, 0);
+      digitalWrite(statePin, HIGH);
+      state = true;
     }
 };
 
-// PressureSensor class definition
 class PressureSensor {
   private:
-    int sensorPin;            // Pin for analog sensor input
-    float sensorOffset;       // Calibration offset
-    float sensorGain;         // Calibration gain
-    float alpha;              // Filter coefficient
-    float pressure_f = 0;     // Filtered pressure
-    float pressure_a = 0;     // Auxiliary filtered pressure
+    int sensorPin;
+    float sensorOffset;
+    float sensorGain;
+    float alpha;
+    float pressure_f = 0;
+    float pressure_a = 0;
 
   public:
-    // Constructor: takes the pin and calibration parameters as arguments
-    PressureSensor(int pin, float offset, float gain, float filterAlpha) {
+    PressureSensor(int pin, float offset, float gain, float filterAlpha){
       sensorPin = pin;
       sensorOffset = offset;
       sensorGain = gain;
       alpha = filterAlpha;
-      pinMode(sensorPin, INPUT);  // Define sensor input for ADC
+      pinMode(sensorPin, INPUT);
     }
 
-    // Read and calibrate the raw pressure value from the sensor
     float readRaw() {
-      return (analogRead(sensorPin) * sensorGain - sensorOffset);
+      return(analogRead(sensorPin) * sensorGain - sensorOffset);
     }
 
-    // Read the filtered pressure value using a low-pass filter
     float readFiltered() {
-      float pressure = readRaw();  // Get the raw pressure value
-      pressure_f = pressure_f + alpha * (pressure - pressure_a);  // Apply filtering
+      float pressure = readRaw();
+      pressure_f = pressure_f + alpha * (pressure - pressure_a);
       pressure_a = pressure_f;
       return pressure_f;
     }
 };
 
-// Create instances of Motor, Valve, and PressureSensor classes
-Motor motor1(E1, M1);  // Motor 1, speed on pin 3, direction on pin 4
-Motor motor2(E3, M3);  // Motor 2, speed on pin 5, direction on pin 8
 
-Valve valve1(E2, M2);  // Valve 1, enable on pin 11, state on pin 12
-Valve valve2(E4, M4);    // Valve 2, enable on pin 6, state on pin 7
+// ______________________________________________________Variables_________________________________________________________________________________//
+int timer;
+bool lock_1 = false;
+bool lock_2 = false;
+float setpoint = 50;
+int motorspeed = 100;
 
-PressureSensor pressureSensor(PRESSURE_SENSOR_PIN, 4.44, 0.109, 0.2);  // Pressure sensor with calibration
+Motor motor1(E1, M1); // M1 = Pump1
+Motor motor2(E3, M3); // M3 = Pump2
 
-void setup() {
-  Serial.begin(115200);  // Start Serial communication
+Valve valve1(E2, M2); // M2 = Valv1
+Valve valve2(E4, M4); // M4 = Valv2
 
-  // Print legend of system parameters
-  Serial.print("Process_Status");
-  Serial.print(",");
-  Serial.print("Pressure_sensor_Value");
-  Serial.print(",");
-  Serial.print("Filtered_Pressure");
-  Serial.println(",");
+PressureSensor sensor1(PRESSURE_SENSOR_1, 4.44, 0.109, 0.2);
+PressureSensor sensor2(PRESSURE_SENSOR_2, 4.44, 0.109, 0.2);
+
+
+void printStatus() {
+  Serial.print("Control state : ");
+  Serial.print(state);
+  Serial.print(" | Valve 1 state : ");
+  Serial.print(valve1.state);
+  Serial.print(" | Pressure 1 : ");
+  Serial.print(sensor1.readFiltered());
+  Serial.print(" | Pressure 2 : ");
+  Serial.print(sensor2.readFiltered());
+  Serial.print(" | Valve 2 state : ");
+  Serial.println(valve2.state);
 }
 
+// ________________________________________________________Set up_________________________________________________________________________________//
+void setup() {
+  Serial.begin(115200);
+  timer = millis();
+}
+
+// __________________________________________________________Loop__________________________________________________________________________________//
 void loop() {
-  timecounter++;
-  int motorspeed = 100;
-  float Setpoint = 20;  // Desired pressure in kPa
 
-  // Read pressure values from the pressure sensor
-  float pressure_sensorValue = pressureSensor.readRaw();      // Raw pressure reading
-  float pressure_f = pressureSensor.readFiltered();           // Filtered pressure reading
+  printStatus();
+  
+  switch (state) {
+    
+    case INFLATE_1:     // Inflate chanel 1, deflate chanel 2
+      if (!valve1.state){
+        valve1.on();
+      }
+      motor2.off();
+      valve2.off();
+      if (!lock_1) {
+        motor1.on(motorspeed);
+      }
 
-  // Control logic using Setpoint
-  if (!lock) {  // Inflation process until reaching the Setpoint (20 kPa)
-    motor1.on(250); // Control motor 1
-    valve1.on();    // Open valve 1
-    stateprocess = 1;
+      if (sensor1.readFiltered() >= setpoint - 1) {  
+        // If pressure is close to Setpoint, stop motor and lock
+        motor1.off();
+        lock_1 = true;
+      }
+
+      if (millis() - timer >= 5000) { // After 50 ms, change state
+        state = INFLATE_1_2;
+        lock_1 = false;
+        timer = millis();
+      }
+
+      
+    case INFLATE_1_2: // Inflate both chanels
+
+      if (!valve1.state){
+        valve1.on();
+      }
+      if (!lock_1) {
+        motor1.on(motorspeed);
+      }
+      if (!valve1.state){
+        valve2.on();
+      }
+      if (!lock_1) {
+        motor2.on(motorspeed);
+      }
+
+
+      if (sensor1.readFiltered() >= setpoint - 1) {  
+        // IF pressure is close to Setpoint, stop motor and lock
+        motor1.off();
+        lock_1 = true;
+      }
+
+      if (sensor2.readFiltered() >= setpoint - 1) {  
+        // If pressure is close to Setpoint, stop motor and lock
+        motor2.off();
+        lock_2 = true;
+      }
+
+      if (millis() - timer >= 5000) { // After 50 ms, change state
+        lock_1 = false;
+        state = INFLATE_2;
+        timer = millis();
+      }
+
+      case INFLATE_2: // Inflate chanel 2, deflate chanel 1
+        if (!valve2.state){
+          valve2.on();
+        }
+        motor1.off();
+        valve1.off();
+        if (!lock_2) {
+          motor2.on(motorspeed);
+        }
+
+      if (sensor2.readFiltered() >= setpoint - 1) {  
+        // If pressure is close to Setpoint, stop motor and lock
+        motor2.off();
+        lock_2 = true;
+      }
+
+      if (millis() - timer >= 5000) { // After 50 ms, change state
+        state = DEFLATE_1_2;
+        lock_2 = false;
+        timer = millis();
+      }
+
+      case DEFLATE_1_2:  // Deflate both chanels
+        motor1.off();
+        valve1.off();
+        motor2.off(); 
+        valve2.off();
+
+      if (millis() - timer >= 5000) { // After 50 ms, change state
+        state = INFLATE_1;
+        timer = millis();
+      }
+
   }
 
-  if (pressure_f >= Setpoint - 1) {  // Once pressure is close to Setpoint, stop motor and lock
-    lock = true;
-    valve1.on();
-    motor1.off();
-    stateprocess = 2;
-  }
-
-  if (timecounter > 70 && timecounter <= 120) {
-    motor1.off();
-    valve1.off();
-    stateprocess = 3;
-  }
-
-  if (timecounter >= 120) {
-    timecounter = 0;
-    lock = false;
-    stateprocess = 4;
-  }
-
-  // Print system parameters to serial monitor
-  Serial.print(stateprocess);
-  Serial.print(",");
-  Serial.print(pressure_sensorValue);
-  Serial.print(",");
-  Serial.print(pressure_f);
-  Serial.println(",");
-
-  delay(100);  // Define sample time = 100 milliseconds
 }
