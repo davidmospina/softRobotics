@@ -36,6 +36,7 @@ class Motor {
   private:
     int speedPin;
     int directionPin;
+    bool state;
 
   public:
     Motor(int spdPin, int dirPin) {
@@ -48,12 +49,14 @@ class Motor {
     void on(int motorspeed) {
       analogWrite(speedPin, motorspeed);
       digitalWrite(directionPin, HIGH);
+      state = true;
     }
       
     void off()
     {
       analogWrite(speedPin, 0);
       digitalWrite(directionPin, HIGH);
+      state = false;
     }
 };
 
@@ -63,6 +66,7 @@ class Valve {
     int statePin;
 
   public:
+    bool state;
     Valve(int enPin, int stPin) {
       enablePin = enPin;
       statePin = stPin;
@@ -73,11 +77,13 @@ class Valve {
     void on() {
       analogWrite(enablePin, 255);
       digitalWrite(statePin, HIGH);
+      state = true;
     }
       
     void off() {
       analogWrite(enablePin, 0);
       digitalWrite(statePin, HIGH);
+      state = false;
     }
 };
 
@@ -135,9 +141,20 @@ void setup() {
 
 // __________________________________________________________Loop__________________________________________________________________________________//
 void loop() {
+  Serial.print("Control state :");
+  Serial.println(state);
+  Serial.print("Valve 1 state : ");
+  Serial.println(valve1.state);
+  Serial.print("Pressure 1 : ");
+  Serial.println(sensor1.readFiltered());
+  Serial.print("Pressure 2:");
+  Serial.println(sensor2.readFiltered());
+  Serial.print("Valve2 state : ");
+  Serial.println(valve2.state);
+  Serial.println();
 
   switch (state) {
-
+    
     case INFLATE_1:     // Inflate chanel 1, deflate chanel 2
       if (!lock_1) {
         motor1.on(motorspeed); 
