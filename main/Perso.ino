@@ -117,6 +117,21 @@ class PressureSensor {
     }
 };
 
+void printStatus() {
+  Serial.print("Control state : ");
+  Serial.print(state);
+  Serial.print(" | Valve 1 state : ");
+  Serial.print(valve1.state);
+  Serial.print(" | Pressure 1 : ");
+  Serial.print(sensor1.readFiltered());
+  Serial.print(" | Pressure 2 : ");
+  Serial.print(sensor2.readFiltered());
+  Serial.print(" | Valve 2 state : ");
+  Serial.print(valve2.state);
+  Serial.print("\r"); // Move back to the start of the line
+  delay(100); // Delay to control the update speed
+}
+
 // ______________________________________________________Variables_________________________________________________________________________________//
 int timer;
 bool lock_1 = false;
@@ -141,18 +156,8 @@ void setup() {
 
 // __________________________________________________________Loop__________________________________________________________________________________//
 void loop() {
-  Serial.print("Control state :");
-  Serial.println(state);
-  Serial.print("Valve 1 state : ");
-  Serial.println(valve1.state);
-  Serial.print("Pressure 1 : ");
-  Serial.println(sensor1.readFiltered());
-  Serial.print("Pressure 2:");
-  Serial.println(sensor2.readFiltered());
-  Serial.print("Valve2 state : ");
-  Serial.println(valve2.state);
-  Serial.println();
-
+  printStatus();
+  
   switch (state) {
     
     case INFLATE_1:     // Inflate chanel 1, deflate chanel 2
