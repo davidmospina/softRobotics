@@ -38,7 +38,7 @@ class Motor {
     int directionPin;
 
   public:
-    bool state;
+    bool state = false;
 
     Motor(int spdPin, int dirPin) {
       speedPin = spdPin;
@@ -67,7 +67,7 @@ class Valve {
     int statePin;
 
   public:
-    bool state;
+    bool state = false;
     Valve(int enPin, int stPin) {
       enablePin = enPin;
       statePin = stPin;
@@ -124,7 +124,7 @@ class PressureSensor {
 int timer;
 bool lock_1 = false;
 bool lock_2 = false;
-float setpoint = 50;
+float setpoint = -3;
 int motorspeed = 100;
 
 Motor motor1(E1, M1); // M1 = Pump1
@@ -153,36 +153,50 @@ void printStatus() {
 // ________________________________________________________Set up_________________________________________________________________________________//
 void setup() {
   Serial.begin(115200);
+  valve1.off();
+  valve2.off();
+  motor1.off();
+  motor2.off();
   timer = millis();
+
 }
 
 // __________________________________________________________Loop__________________________________________________________________________________//
 void loop() {
+    delay(1000);
+    // printStatus();
 
-  printStatus();
-  
   switch (state) {
+
+    
     
     case INFLATE_1:     // Inflate chanel 1, deflate chanel 2
       if (!valve1.state){
         valve1.on();
       }
-      motor2.off();
-      valve2.off();
-      if (!lock_1) {
+      if (valve2.state){
+        motor2.off();
+        valve2.off();
+      }
+        
+      if (!lock_1 && !motor1.state) {
         motor1.on(motorspeed);
       }
 
-      if (sensor1.readFiltered() >= setpoint - 1) {  
+      if (sensor1.readFiltered() <= setpoint) {  
         // If pressure is close to Setpoint, stop motor and lock
+        // printStatus();
         motor1.off();
         lock_1 = true;
+        printStatus();
+
       }
 
-      if (millis() - timer >= 5000) { // After 50 ms, change state
+      if (millis() - timer >= 10000) { // After 50 ms, change state
         state = INFLATE_1_2;
-        lock_1 = false;
         timer = millis();
+        Serial.println("timeout reached");
+
       }
 
       
@@ -191,67 +205,77 @@ void loop() {
       if (!valve1.state){
         valve1.on();
       }
-      if (!lock_1) {
+      if (!lock_1 && !motor1.state ) {
         motor1.on(motorspeed);
       }
-      if (!valve1.state){
+      if (!valve2.state){
         valve2.on();
       }
-      if (!lock_1) {
+      if (!lock_2 && !motor2.state) {
         motor2.on(motorspeed);
       }
 
 
-      if (sensor1.readFiltered() >= setpoint - 1) {  
+      if (sensor1.readFiltered() <= setpoint ) {  
         // IF pressure is close to Setpoint, stop motor and lock
         motor1.off();
         lock_1 = true;
       }
 
-      if (sensor2.readFiltered() >= setpoint - 1) {  
+      if (sensor2.readFiltered() <= setpoint) {  
         // If pressure is close to Setpoint, stop motor and lock
         motor2.off();
         lock_2 = true;
       }
 
-      if (millis() - timer >= 5000) { // After 50 ms, change state
-        lock_1 = false;
-        state = INFLATE_2;
-        timer = millis();
-      }
+      // if (millis() - timer >= 10000) { // After 50 ms, change state
+      //   lock_1 = false;
+      //   state = INFLATE_2;
+      //   timer = millis();
+      // }
 
-      case INFLATE_2: // Inflate chanel 2, deflate chanel 1
-        if (!valve2.state){
-          valve2.on();
-        }
-        motor1.off();
-        valve1.off();
-        if (!lock_2) {
-          motor2.on(motorspeed);
-        }
+    //   case INFLATE_2: // Inflate chanel 2, deflate chanel 1
+    //     if (!valve2.state){
+    //       valve2.on();
+    //     }
 
-      if (sensor2.readFiltered() >= setpoint - 1) {  
-        // If pressure is close to Setpoint, stop motor and lock
-        motor2.off();
-        lock_2 = true;
-      }
+    //     if (valve1.state){
+    //     valve1.off();
+    //     }
 
-      if (millis() - timer >= 5000) { // After 50 ms, change state
-        state = DEFLATE_1_2;
-        lock_2 = false;
-        timer = millis();
-      }
+    //     motor1.off();
 
-      case DEFLATE_1_2:  // Deflate both chanels
-        motor1.off();
-        valve1.off();
-        motor2.off(); 
-        valve2.off();
+    //     if (!lock_2) {
+    //       motor2.on(motorspeed);
+    //     }
 
-      if (millis() - timer >= 5000) { // After 50 ms, change state
-        state = INFLATE_1;
-        timer = millis();
-      }
+    //   if (sensor2.readFiltered() >= setpoint - 1) {  
+    //     // If pressure is close to Setpoint, stop motor and lock
+    //     motor2.off();
+    //     lock_2 = true;
+    //   }
+
+    //   if (millis() - timer >= 5000) { // After 50 ms, change state
+    //     state = DEFLATE_1_2;
+    //     lock_2 = false;
+    //     timer = millis();
+    //   }
+
+    //   case DEFLATE_1_2:  // Deflate both chanels
+    //   if (valve1.state){
+    //     valve1.off();
+    //     }
+
+    //   if (valve2.state){
+    //     valve2.off();
+    //     }
+    //     motor2.off(); 
+    //     valve2.off();
+
+    //   if (millis() - timer >= 5000) { // After 50 ms, change state
+    //     state = INFLATE_1;
+    //     timer = millis();
+    //   }
 
   }
 
