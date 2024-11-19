@@ -1,5 +1,7 @@
+#include <Servo.h>
 #define PRESSURE_SENSOR_1 (A1) //  MPX5100 Series Integrated Silicon Pressure Sensor analog input (0 to 100 kPa)
 #define PRESSURE_SENSOR_2 (A2)
+
 
 // ________________________________________________Arduino PWM Speed Control_______________________________________________________________________//
 
@@ -135,6 +137,7 @@ Valve valve2(E4, M4); // M4 = Valv2
 
 PressureSensor sensor1(PRESSURE_SENSOR_1, 4.44, 0.109, 0.2);
 PressureSensor sensor2(PRESSURE_SENSOR_2, 4.44, 0.109, 0.2);
+
 
 
 void printStatus() {
