@@ -127,7 +127,15 @@ int timer;
 bool lock_1 = false;
 bool lock_2 = false;
 float setpoint = -3;
-int motorspeed = 100;
+int motorBlow = 200;
+int motorSuck = 200;
+
+
+// _______________________________________________________Digital Input Pin________________________________________________________________________//
+const int controlPin = 9; // Input pin for control signal
+const float fAlternate = 5000; // Frequency in Hz for valve alternation
+unsigned long alternatePeriod = 1000 / fAlternate; // Alternation period in milliseconds
+unsigned long lastToggleTime = 0; // Time tracker for alternation
 
 Motor motor1(E1, M1); // M1 = Pump1
 Motor motor2(E3, M3); // M3 = Pump2
@@ -158,128 +166,44 @@ void setup() {
   Serial.begin(115200);
   valve1.off();
   valve2.off();
-  motor1.off();
-  motor2.off();
+  motor1.on(motorSuck);
+  motor2.on(motorSuck);
   timer = millis();
 
 }
-
-// __________________________________________________________Loop__________________________________________________________________________________//
 void loop() {
-    delay(1000);
-    // printStatus();
+  // int controlSignal = digitalRead(controlPin); // Read the control signal
 
-  switch (state) {
+  // if (controlSignal == HIGH) {
+    // unsigned long currentTime = millis();
 
-    
-    
-    case INFLATE_1:     // Inflate chanel 1, deflate chanel 2
-      if (!valve1.state){
-        valve1.on();
-      }
-      if (valve2.state){
-        motor2.off();
-        valve2.off();
-      }
-        
-      if (!lock_1 && !motor1.state) {
-        motor1.on(motorspeed);
-      }
+    // Alternate valves based on the alternation period
+    // if (currentTime - lastToggleTime >= alternatePeriod) {
+    //   lastToggleTime = currentTime;
 
-      if (sensor1.readFiltered() <= setpoint) {  
-        // If pressure is close to Setpoint, stop motor and lock
-        // printStatus();
-        motor1.off();
-        lock_1 = true;
-        printStatus();
+      // Toggle valve states
+    valve1.on();
+    valve2.on();
+    delay(500);
 
-      }
+    // valve1.off();
+    // valve2.off();
+    // delay(700);
 
-      if (millis() - timer >= 10000) { // After 50 ms, change state
-        state = INFLATE_1_2;
-        timer = millis();
-        Serial.println("timeout reached");
+    // valve1.off();
+    // valve2.on();
+    // delay(2000);
 
-      }
-
-      
-    case INFLATE_1_2: // Inflate both chanels
-
-      if (!valve1.state){
-        valve1.on();
-      }
-      if (!lock_1 && !motor1.state ) {
-        motor1.on(motorspeed);
-      }
-      if (!valve2.state){
-        valve2.on();
-      }
-      if (!lock_2 && !motor2.state) {
-        motor2.on(motorspeed);
-      }
+    valve1.off();
+    valve2.on();
+    delay(500);
 
 
-      if (sensor1.readFiltered() <= setpoint ) {  
-        // IF pressure is close to Setpoint, stop motor and lock
-        motor1.off();
-        lock_1 = true;
-      }
-
-      if (sensor2.readFiltered() <= setpoint) {  
-        // If pressure is close to Setpoint, stop motor and lock
-        motor2.off();
-        lock_2 = true;
-      }
-
-      // if (millis() - timer >= 10000) { // After 50 ms, change state
-      //   lock_1 = false;
-      //   state = INFLATE_2;
-      //   timer = millis();
-      // }
-
-    //   case INFLATE_2: // Inflate chanel 2, deflate chanel 1
-    //     if (!valve2.state){
-    //       valve2.on();
-    //     }
-
-    //     if (valve1.state){
-    //     valve1.off();
-    //     }
-
-    //     motor1.off();
-
-    //     if (!lock_2) {
-    //       motor2.on(motorspeed);
-    //     }
-
-    //   if (sensor2.readFiltered() >= setpoint - 1) {  
-    //     // If pressure is close to Setpoint, stop motor and lock
-    //     motor2.off();
-    //     lock_2 = true;
-    //   }
-
-    //   if (millis() - timer >= 5000) { // After 50 ms, change state
-    //     state = DEFLATE_1_2;
-    //     lock_2 = false;
-    //     timer = millis();
-    //   }
-
-    //   case DEFLATE_1_2:  // Deflate both chanels
-    //   if (valve1.state){
-    //     valve1.off();
-    //     }
-
-    //   if (valve2.state){
-    //     valve2.off();
-    //     }
-    //     motor2.off(); 
-    //     valve2.off();
-
-    //   if (millis() - timer >= 5000) { // After 50 ms, change state
-    //     state = INFLATE_1;
-    //     timer = millis();
-    //   }
-
-  }
-
+     
+    // }
+  // } else {
+  //   // If the control signal is LOW, turn both valves OFF
+  //   valve1.off();
+  //   valve2.off();
+  // }
 }
