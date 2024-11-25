@@ -6,39 +6,26 @@
 #define SWITCH_1_LEFT (2)
 #define SWITCH_2 (13)
 
-// ________________________________________________Arduino PWM Speed Control_______________________________________________________________________//
-
-// M1 = Pump1
-int E1 = 3; //Speed
-int M1 = 4; //Direction
-
-// M2 = Valv1
-int E2 = 11;   //Enable
-int M2 = 12;  //State
-
-// M3 = Pump2
-const int E3 = 5;
-const int M3 = 8;
-
-// M4 = Valv2
-const int E4 = 6;
-const int M4 = 7;
-
 // ______________________________________________________Variables_________________________________________________________________________________//
-int motorspeed = 150;
+//int motorspeed = 250;
 int time = 500;
 int pos_servo_1 = 50; //in degree between 0 and 180
 int pos_servo_2 = 50; //in degree between 0 and 180
 
-//___________________________________________________________States________________________________________________________________________________//
-enum State {
-  DEFLATE_1,
-  DEFLATE_1_2,
-  DEFLATE_2,
-  INFLATE_1_2,
-};
 
-State state_forward = DEFLATE_1;
+// ________________________________________________Arduino PWM Speed Control_______________________________________________________________________//
+
+const int E1 = 3; //Speed
+const int M1 = 4; //Direction
+
+const int E2 = 11;   //Enable
+const int M2 = 12;  //State
+
+const int E3 = 5;
+const int M3 = 8;
+
+const int E4 = 6;
+const int M4 = 7;
 
 //___________________________________________________________Class________________________________________________________________________________//
 
@@ -85,25 +72,25 @@ class Valve {
       pinMode(statePin, OUTPUT);
     }
 
-    void off() {
+    void inflate() {
       analogWrite(enablePin, 255);
       digitalWrite(statePin, HIGH);
       state = false;
       //Serial.println("try to on valve");
     }
       
-    void on() {
+    void deflate() {
       analogWrite(enablePin, 0);
       digitalWrite(statePin, HIGH);
       state = true;
     }
 };
 
-Motor motor1(E1, M1); // M1 = Pump1
-Motor motor2(E3, M3); // M3 = Pump2
+// Motor motor1(E2, M2); // M2 = Pump1
+// Motor motor2(E4, M4); // M4 = Pump2
 
-Valve valve1(E2, M2); // M2 = Valv1
-Valve valve2(E4, M4); // M4 = Valv2
+Valve valv_outside(E1, M1); 
+Valve valv_inside(E3, M3);
 
 Servo servo1;
 Servo servo2;
@@ -112,20 +99,27 @@ Servo servo2;
 
 void goForward() {
   
-    if (!motor1.state){
-      motor1.on(motorspeed);
-    }
-    if (!motor2.state){
-      motor2.on(motorspeed);
-    }
+    // if (!motor1.state){
+    //   motor1.on(motorspeed);
+    // }
+    // if (!motor2.state){
+    //   motor2.on(motorspeed);
+    // }
 
-    valve1.on();
+    valv_inside.deflate();
+    valv_outside.inflate();
     delay(time);
-    valve2.on();
+
+    valv_inside.deflate();
+    valv_outside.deflate();
     delay(time);
-    valve1.off();
+
+    valv_inside.inflate();
+    valv_outside.deflate();
     delay(time);
-    valve2.off();
+
+    valv_inside.inflate();
+    valv_outside.inflate();
     delay(time);
 }
 
@@ -133,38 +127,65 @@ void goForward() {
 // ________________________________________________________Set up_________________________________________________________________________________//
 void setup() {
   //Serial.begin(115200);
-  valve1.off();
-  valve2.off();
-  motor1.off();
-  motor2.off();
+  valv_outside.deflate();
+  valv_inside.deflate();
+  // motor1.off();
+  // motor2.off();
   servo1.attach(SERVO_1);
   servo2.attach(SERVO_2);
   pinMode(SWITCH_1_RIGHT, INPUT_PULLUP); //right position : digitalRead(2) = 1 & digitalRead(3) = 0
   pinMode(SWITCH_1_LEFT, INPUT_PULLUP); //left position : digitalRead(3) = 1 & digitalRead(2) = 0
                                        // middle position : digitalRead(2) = digitalRead(3) = 1
   pinMode(SWITCH_2, INPUT_PULLUP);
+  while (digitalRead(SWITCH_1_RIGHT)==0){
+    delay(100);
+  }
 
 }
 
 // __________________________________________________________Loop__________________________________________________________________________________//
 void loop() {
-  if (digitalRead(SWITCH_2)==0){
-    goForward();
 
-    if (digitalRead(SWITCH_1_RIGHT) == 0){
-      servo2.write(pos_servo_2);
-    } else if (digitalRead(SWITCH_1_LEFT) == 0){
-      servo1.write(pos_servo_1);
-    } else{
-      servo1.write(0);
-      servo2.write(0);
-    }
-  } else{
-    valve1.off();
-    valve2.off();
-    motor1.off();
-    motor2.off();
-  }
+  goForward();
+  
+
+  // if (digitalRead(SWITCH_1_RIGHT) == 0){
+  //   valv_in_deflate.off();
+  //   valv_in_inflate.off();
+  //   valv_out_inflate.off();
+  //   valv_out_deflate.off();
+  //   servo2.write(pos_servo_2);
+  // } else if (digitalRead(SWITCH_1_LEFT) == 0){
+  //   valv_in_deflate.off();
+  //   valv_in_inflate.off();
+  //   valv_out_inflate.off();
+  //   valv_out_deflate.off();
+  //   servo1.write(pos_servo_1);
+  // } else{
+  //     servo1.write(0);
+  //     servo2.write(0);
+  //     goForward();
+  // }
+
+  // if (digitalRead(SWITCH_2)==0){
+  //   goForward();
+
+  //   if (digitalRead(SWITCH_1_RIGHT) == 0){
+  //     servo2.write(pos_servo_2);
+  //   } else if (digitalRead(SWITCH_1_LEFT) == 0){
+  //     servo1.write(pos_servo_1);
+  //   } else{
+  //     servo1.write(0);
+  //     servo2.write(0);
+  //   }
+  // } else{
+  //   valv_in_deflate.off();
+  //   valv_in_inflate.off();
+  //   valv_out_inflate.off();
+  //   valv_out_deflate.off();
+  //   // motor1.off();
+  //   // motor2.off();
+  // }
   
 
   
