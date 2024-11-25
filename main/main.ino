@@ -206,19 +206,19 @@ void loop() {
     valve1.off();
     valve2.off();
     delay(300);
+3v
+    // // climb:
+    // valve1.on();
+    // valve2.off();
+    // delay(350);
 
-    // climb:
-    valve1.on();
-    valve2.off();
-    delay(350);
+    // valve1.off();
+    // valve2.on();
+    // delay(350);
 
-    valve1.off();
-    valve2.on();
-    delay(350);
-
-    valve1.off();
-    valve2.off();
-    delay(100);
+    // valve1.off();
+    // valve2.off();
+    // delay(100);
 
      
     // }
