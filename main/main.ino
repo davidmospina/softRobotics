@@ -128,7 +128,7 @@ bool lock_1 = false;
 bool lock_2 = false;
 float setpoint = -3;
 int motorBlow = 200;
-int motorSuck = 200;
+int motorSuck = 255;
 
 
 // _______________________________________________________Digital Input Pin________________________________________________________________________//
@@ -181,23 +181,44 @@ void loop() {
     // if (currentTime - lastToggleTime >= alternatePeriod) {
     //   lastToggleTime = currentTime;
 
-      // Toggle valve states
-    valve1.on();
-    valve2.on();
-    delay(500);
-
-    // valve1.off();
+      // Table:
+    // valve1.on();
     // valve2.off();
-    // delay(700);
+    // delay(350);
 
     // valve1.off();
     // valve2.on();
-    // delay(2000);
+    // delay(350);
+
+    // valve1.off();
+    // valve2.off();
+    // delay(100);
+
+      // foam:
+    valve1.on();
+    valve2.off();
+    delay(550);
 
     valve1.off();
     valve2.on();
-    delay(500);
+    delay(550);
 
+    valve1.off();
+    valve2.off();
+    delay(300);
+
+    // climb:
+    valve1.on();
+    valve2.off();
+    delay(350);
+
+    valve1.off();
+    valve2.on();
+    delay(350);
+
+    valve1.off();
+    valve2.off();
+    delay(100);
 
      
     // }
