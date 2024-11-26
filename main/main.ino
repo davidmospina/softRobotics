@@ -1,67 +1,29 @@
 #include <Servo.h>
-#define PRESSURE_SENSOR_1 (A1) //  MPX5100 Series Integrated Silicon Pressure Sensor analog input (0 to 100 kPa)
-#define PRESSURE_SENSOR_2 (A2)
 
+#define SERVO_1 (9) // RIGHT
+#define SERVO_2 (10) // LEFT
+#define INPUT_PIN (13) // Using pin 13 for input from 3.3V
+
+// ______________________________________________________Variables_________________________________________________________________________________//
+int time = 1500;
+int pos_servo_1 = 50; // in degree between 0 and 180
+int pos_servo_2 = 50; // in degree between 0 and 180
 
 // ________________________________________________Arduino PWM Speed Control_______________________________________________________________________//
 
-// M1 = Pump1
-int E1 = 3; //Speed
-int M1 = 4; //Direction
+const int E1 = 3; // Speed
+const int M1 = 4; // Direction
 
-// M2 = Valv1
-int E2 = 11;   //Enable
-int M2 = 12;  //State
+const int E2 = 11;   // Enable
+const int M2 = 12;   // State
 
-// M3 = Pump2
 const int E3 = 5;
 const int M3 = 8;
 
-// M4 = Valv2
 const int E4 = 6;
 const int M4 = 7;
 
-//___________________________________________________________States________________________________________________________________________________//
-enum State {
-  INFLATE_1,
-  INFLATE_1_2,
-  INFLATE_2,
-  DEFLATE_1_2,
-};
-
-State state = INFLATE_1;
-State previousState;
-
 //___________________________________________________________Class________________________________________________________________________________//
-
-class Motor {
-  private:
-    int speedPin;
-    int directionPin;
-
-  public:
-    bool state = false;
-
-    Motor(int spdPin, int dirPin) {
-      speedPin = spdPin;
-      directionPin = dirPin;
-      pinMode(speedPin, OUTPUT);
-      pinMode(directionPin, OUTPUT);
-    }
-
-    void on(int motorspeed) {
-      analogWrite(speedPin, motorspeed);
-      digitalWrite(directionPin, HIGH);
-      state = true;
-    }
-      
-    void off()
-    {
-      analogWrite(speedPin, 0);
-      digitalWrite(directionPin, HIGH);
-      state = false;
-    }
-};
 
 class Valve {
   private:
@@ -70,6 +32,7 @@ class Valve {
 
   public:
     bool state = false;
+
     Valve(int enPin, int stPin) {
       enablePin = enPin;
       statePin = stPin;
@@ -81,7 +44,6 @@ class Valve {
       analogWrite(enablePin, 255);
       digitalWrite(statePin, HIGH);
       state = false;
-      //Serial.println("try to on valve");
     }
       
     void on() {
@@ -91,140 +53,161 @@ class Valve {
     }
 };
 
-class PressureSensor {
-  private:
-    int sensorPin;
-    float sensorOffset;
-    float sensorGain;
-    float alpha;
-    float pressure_f = 0;
-    float pressure_a = 0;
+// Valve instances
+Valve valv_inside_deflate(E1, M1);
+Valve valv_outside_deflate(E3, M3);
+Valve valv_inside_inflate(E4, M4);
 
-  public:
-    PressureSensor(int pin, float offset, float gain, float filterAlpha){
-      sensorPin = pin;
-      sensorOffset = offset;
-      sensorGain = gain;
-      alpha = filterAlpha;
-      pinMode(sensorPin, INPUT);
-    }
+Servo servo1;
+Servo servo2;
 
-    float readRaw() {
-      return(analogRead(sensorPin) * sensorGain - sensorOffset);
-    }
+// ______________________________________________________Functions_________________________________________________________________________________//
 
-    float readFiltered() {
-      float pressure = readRaw();
-      pressure_f = pressure_f + alpha * (pressure - pressure_a);
-      pressure_a = pressure_f;
-      return pressure_f;
-    }
-};
+void goForward() {
+    valv_inside_deflate.on();
+    valv_inside_inflate.off();
+    valv_outside_deflate.off();
+    delay(time);
 
+    valv_inside_deflate.off();
+    valv_inside_inflate.on();
+    valv_outside_deflate.on();
+    delay(time);
 
-// ______________________________________________________Variables_________________________________________________________________________________//
-int timer;
-bool lock_1 = false;
-bool lock_2 = false;
-float setpoint = -3;
-int motorBlow = 200;
-int motorSuck = 255;
-
-
-// _______________________________________________________Digital Input Pin________________________________________________________________________//
-const int controlPin = 9; // Input pin for control signal
-const float fAlternate = 5000; // Frequency in Hz for valve alternation
-unsigned long alternatePeriod = 1000 / fAlternate; // Alternation period in milliseconds
-unsigned long lastToggleTime = 0; // Time tracker for alternation
-
-Motor motor1(E1, M1); // M1 = Pump1
-Motor motor2(E3, M3); // M3 = Pump2
-
-Valve valve1(E2, M2); // M2 = Valv1
-Valve valve2(E4, M4); // M4 = Valv2
-
-PressureSensor sensor1(PRESSURE_SENSOR_1, 4.44, 0.109, 0.2);
-PressureSensor sensor2(PRESSURE_SENSOR_2, 4.44, 0.109, 0.2);
-
-
-
-void printStatus() {
-  Serial.print("Control state : ");
-  Serial.print(state);
-  Serial.print(" | Valve 1 state : ");
-  Serial.print(valve1.state);
-  Serial.print(" | Pressure 1 : ");
-  Serial.print(sensor1.readFiltered());
-  Serial.print(" | Pressure 2 : ");
-  Serial.print(sensor2.readFiltered());
-  Serial.print(" | Valve 2 state : ");
-  Serial.println(valve2.state);
+    valv_inside_deflate.off();
+    valv_inside_inflate.on();
+    valv_outside_deflate.off();
+    delay(time);
 }
 
-// ________________________________________________________Set up_________________________________________________________________________________//
+// ________________________________________________________Setup_________________________________________________________________________________//
 void setup() {
   Serial.begin(115200);
-  valve1.off();
-  valve2.off();
-  motor1.on(motorSuck);
-  motor2.on(motorSuck);
-  timer = millis();
+  pinMode(INPUT_PIN, INPUT_PULLUP); // Set pin 13 as input with pull-down
+  valv_inside_deflate.off();
+  valv_inside_inflate.off();
 
+  valv_outside_deflate.off();
+  servo1.attach(SERVO_1);
+  servo2.attach(SERVO_2);
+  // motor1.off();
+  // motor2.off();
 }
+
+// __________________________________________________________Loop__________________________________________________________________________________//
 void loop() {
-  // int controlSignal = digitalRead(controlPin); // Read the control signal
 
-  // if (controlSignal == HIGH) {
-    // unsigned long currentTime = millis();
+  // Check if 3.3V is connected to INPUT_PIN
 
-    // Alternate valves based on the alternation period
-    // if (currentTime - lastToggleTime >= alternatePeriod) {
-    //   lastToggleTime = currentTime;
+  // goForward();
+  // valv_inside_deflate.on();
+  // valv_inside_inflate.off();
+  // valv_outside_deflate.off();
+  // delay(time*0.75);
 
-      // Table:
-    // valve1.on();
-    // valve2.off();
-    // delay(350);
+  // valv_inside_deflate.on();
+  // valv_inside_inflate.off();
+  // valv_outside_deflate.on();
+  // delay(time)*0.25;
 
-    // valve1.off();
-    // valve2.on();
-    // delay(350);
 
-    // valve1.off();
-    // valve2.off();
-    // delay(100);
+  // valv_inside_deflate.off();
+  // valv_inside_inflate.on();
+  // valv_outside_deflate.on();
+  // delay(time);
 
-      // foam:
-    valve1.on();
-    valve2.off();
-    delay(550);
+  // valv_inside_deflate.off();
+  // valv_inside_inflate.on();
+  // valv_outside_deflate.off();
+  // delay(time*0.75);
 
-    valve1.off();
-    valve2.on();
-    delay(550);
 
-    valve1.off();
-    valve2.off();
-    delay(300);
-3v
-    // // climb:
-    // valve1.on();
-    // valve2.off();
-    // delay(350);
+  valv_inside_deflate.on();
+  valv_inside_inflate.off();
+  valv_outside_deflate.off();
+  delay(time/4);
 
-    // valve1.off();
-    // valve2.on();
-    // delay(350);
+  valv_outside_deflate.on();
+  delay(time/20);
 
-    // valve1.off();
-    // valve2.off();
-    // delay(100);
+  valv_outside_deflate.on();
+  valv_inside_inflate.on();
+  delay(time/12);
+  
+  valv_inside_deflate.off();
+  valv_inside_inflate.on();
+  delay(time*1/4);
 
-     
-    // }
-  // } else {
-  //   // If the control signal is LOW, turn both valves OFF
-  //   valve1.off();
-  //   valve2.off();
+  valv_inside_deflate.off();
+  valv_inside_inflate.on();
+  valv_outside_deflate.off();
+  delay(time/6);
+
+  
+
+  
+
+// Preserving all your commented code:
+  // while (digitalRead(SWITCH_1_RIGHT)==0 || digitalRead(SWITCH_1_LEFT)==0){
+  //   delay(100);
   // }
+  // while (digitalRead(13)==0){
+  //   delay(100);
+  // }
+
+  // if (digitalRead(SWITCH_1_RIGHT) == 0){
+  //   valv_in_deflate.off();
+  //   valv_in_inflate.off();
+  //   valv_out_inflate.off();
+  //   valv_out_deflate.off();
+  //   servo2.write(pos_servo_2);
+  // } else if (digitalRead(SWITCH_1_LEFT) == 0){
+  //   valv_in_deflate.off();
+  //   valv_in_inflate.off();
+  //   valv_out_inflate.off();
+  //   valv_out_deflate.off();
+  //   servo1.write(pos_servo_1);
+  // } else{
+  //     servo1.write(0);
+  //     servo2.write(0);
+  //     goForward();
+  // }
+
+  // if (digitalRead(SWITCH_2)==0){
+  //   goForward();
+
+  //   if (digitalRead(SWITCH_1_RIGHT) == 0){
+  //     servo2.write(pos_servo_2);
+  //   } else if (digitalRead(SWITCH_1_LEFT) == 0){
+  //     servo1.write(pos_servo_1);
+  //   } else{
+  //     servo1.write(0);
+  //     servo2.write(0);
+  //   }
+  // } else{
+  //   valv_in_deflate.off();
+  //   valv_in_inflate.off();
+  //   valv_out_inflate.off();
+  //   valv_out_deflate.off();
+  //   // motor1.off();
+  //   // motor2.off();
+  // }
+
+  //_____Test servo___//
+  // servo1.write(pos_servo_1);
+  // Serial.println("1");
+  // delay(1000);
+  // servo1.write(0);
+  // Serial.println("2");
+  // delay(1000);
+
+  // servo2.write(pos_servo_2);
+  // Serial.println("1");
+  // delay(1000);
+  // servo2.write(0);
+  // Serial.println("2");
+  // delay(1000);
+
+  //____old code____//
+  // Code removed for brevity as requested
 }
